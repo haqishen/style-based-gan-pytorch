@@ -64,7 +64,7 @@ def train(args, dataset, generator, discriminator):
     adjust_lr(g_optimizer, args.lr.get(resolution, 0.001))
     adjust_lr(d_optimizer, args.lr.get(resolution, 0.001))
 
-    pbar = tqdm(range(3_000_000))
+    pbar = tqdm(range(args.iters))
 
     requires_grad(generator, False)
     requires_grad(discriminator, True)
@@ -268,6 +268,7 @@ if __name__ == '__main__':
         default=600_000,
         help='number of samples used for each training phases',
     )
+    parser.add_argument('--iters', default=100000, type=int, help='total iterations')
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     parser.add_argument('--sched', action='store_true', help='use lr scheduling')
     parser.add_argument('--init_size', default=8, type=int, help='initial image size')
