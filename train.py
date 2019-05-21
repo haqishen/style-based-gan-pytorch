@@ -94,7 +94,7 @@ def train(args, dataset, generator, discriminator):
             resolution = 4 * 2 ** step
 
             loader = sample_data(
-                dataset, args.batch.get(resolution, max(1, args.batch//(2**(step-1)))), resolution
+                dataset, args.batch.get(resolution, max(1, args.batch_size // (2 ** (step - 1)))), resolution
             )
             data_loader = iter(loader)
 
