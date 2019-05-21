@@ -57,7 +57,7 @@ def train(args, dataset, generator, discriminator):
     step = int(math.log2(args.init_size)) - 2
     resolution = 4 * 2 ** step
     loader = sample_data(
-        dataset, args.batch.get(resolution, args.batch_default), resolution
+        dataset, args.batch.get(resolution, args.batch_size), resolution
     )
     data_loader = iter(loader)
 
@@ -94,7 +94,7 @@ def train(args, dataset, generator, discriminator):
             resolution = 4 * 2 ** step
 
             loader = sample_data(
-                dataset, args.batch.get(resolution, args.batch_default), resolution
+                dataset, args.batch.get(resolution, max(1, args.batch//(2**(step-1)))), resolution
             )
             data_loader = iter(loader)
 
@@ -249,7 +249,6 @@ def train(args, dataset, generator, discriminator):
 
 if __name__ == '__main__':
     code_size = 512
-    batch_size = 16
     n_critic = 1
 
     parser = argparse.ArgumentParser(description='Progressive Growing of GANs')
@@ -269,10 +268,11 @@ if __name__ == '__main__':
         help='number of samples used for each training phases',
     )
     parser.add_argument('--iters', default=100000, type=int, help='total iterations')
+    parser.add_argument('--batch-size', default=32, type=int, help='total iterations')
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     parser.add_argument('--sched', action='store_true', help='use lr scheduling')
-    parser.add_argument('--init_size', default=8, type=int, help='initial image size')
-    parser.add_argument('--max_size', default=256, type=int, help='max image size')
+    parser.add_argument('--init-size', default=8, type=int, help='initial image size')
+    parser.add_argument('--max-size', default=256, type=int, help='max image size')
     parser.add_argument(
         '--mixing', action='store_true', help='use mixing regularization'
     )
