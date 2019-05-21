@@ -1,3 +1,4 @@
+import os
 import argparse
 import random
 import math
@@ -120,8 +121,8 @@ def train(args, dataset, generator, discriminator):
         used_sample += real_image.shape[0]
 
         b_size = real_image.size(0)
-        real_image = real_image.cuda()
-        label = label.cuda()
+        real_image = real_image.to(args.device)
+        label = label.to(args.device)
 
         if args.loss == 'wgan-gp':
             real_predict = discriminator(real_image, step=step, alpha=alpha)
@@ -146,13 +147,13 @@ def train(args, dataset, generator, discriminator):
 
         if args.mixing and random.random() < 0.9:
             gen_in11, gen_in12, gen_in21, gen_in22 = torch.randn(
-                4, b_size, code_size, device='cuda'
+                4, b_size, code_size, device=args.device
             ).chunk(4, 0)
             gen_in1 = [gen_in11.squeeze(0), gen_in12.squeeze(0)]
             gen_in2 = [gen_in21.squeeze(0), gen_in22.squeeze(0)]
 
         else:
-            gen_in1, gen_in2 = torch.randn(2, b_size, code_size, device='cuda').chunk(
+            gen_in1, gen_in2 = torch.randn(2, b_size, code_size, device=args.device).chunk(
                 2, 0
             )
             gen_in1 = gen_in1.squeeze(0)
@@ -165,7 +166,7 @@ def train(args, dataset, generator, discriminator):
             fake_predict = fake_predict.mean()
             fake_predict.backward()
 
-            eps = torch.rand(b_size, 1, 1, 1).cuda()
+            eps = torch.rand(b_size, 1, 1, 1).to(args.device)
             x_hat = eps * real_image.data + (1 - eps) * fake_image.data
             x_hat.requires_grad = True
             hat_predict = discriminator(x_hat, step=step, alpha=alpha)
@@ -221,7 +222,7 @@ def train(args, dataset, generator, discriminator):
                 for _ in range(gen_i):
                     images.append(
                         g_running(
-                            torch.randn(gen_j, code_size).cuda(), step=step, alpha=alpha
+                            torch.randn(gen_j, code_size).to(args.device), step=step, alpha=alpha
                         ).data.cpu()
                     )
 
@@ -253,9 +254,13 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Progressive Growing of GANs')
 
-    parser.add_argument('path', type=str, help='path of specified dataset')
     parser.add_argument(
-        '--n_gpu', type=int, default=4, help='number of gpu used for training'
+        '--path', type=str,
+        default=os.path.join(os.environ.get('DATA_DIR'), 'animeface-character-dataset/thumb'),
+        help='path of specified dataset'
+    )
+    parser.add_argument(
+        '--n_gpu', type=int, default=1, help='number of gpu used for training'
     )
     parser.add_argument(
         '--phase',
@@ -266,7 +271,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     parser.add_argument('--sched', action='store_true', help='use lr scheduling')
     parser.add_argument('--init_size', default=8, type=int, help='initial image size')
-    parser.add_argument('--max_size', default=1024, type=int, help='max image size')
+    parser.add_argument('--max_size', default=256, type=int, help='max image size')
     parser.add_argument(
         '--mixing', action='store_true', help='use mixing regularization'
     )
@@ -287,10 +292,11 @@ if __name__ == '__main__':
     )
 
     args = parser.parse_args()
+    args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    generator = nn.DataParallel(StyledGenerator(code_size)).cuda()
-    discriminator = nn.DataParallel(Discriminator()).cuda()
-    g_running = StyledGenerator(code_size).cuda()
+    generator = nn.DataParallel(StyledGenerator(code_size)).to(args.device)
+    discriminator = nn.DataParallel(Discriminator()).to(args.device)
+    g_running = StyledGenerator(code_size).to(args.device)
     g_running.train(False)
 
     class_loss = nn.CrossEntropyLoss()
@@ -326,5 +332,5 @@ if __name__ == '__main__':
     args.gen_sample = {512: (8, 4), 1024: (4, 2)}
 
     args.batch_default = 32
-
+    import ipdb; ipdb.set_trace()
     train(args, dataset, generator, discriminator)
