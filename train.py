@@ -55,6 +55,7 @@ def adjust_lr(optimizer, lr):
 
 def train(args, dataset, generator, discriminator):
     step = int(math.log2(args.init_size)) - 2
+    max_step = int(math.log2(args.max_size)) - 2
     resolution = 4 * 2 ** step
     loader = sample_data(
         dataset, args.batch.get(resolution, args.batch_size), resolution
@@ -81,23 +82,7 @@ def train(args, dataset, generator, discriminator):
 
         alpha = min(1, 1 / args.phase * (used_sample + 1))
 
-        if used_sample > args.phase * 2:
-            step += 1
-
-            if step > int(math.log2(args.max_size)) - 2:
-                step = int(math.log2(args.max_size)) - 2
-
-            else:
-                alpha = 0
-                used_sample = 0
-
-            resolution = 4 * 2 ** step
-
-            loader = sample_data(
-                dataset, args.batch.get(resolution, max(1, args.batch_size // (2 ** (step - 1)))), resolution
-            )
-            data_loader = iter(loader)
-
+        if (used_sample > args.phase * 2) and (step <= max_step):
             if not args.debug:
                 torch.save(
                     {
@@ -106,8 +91,19 @@ def train(args, dataset, generator, discriminator):
                         'g_optimizer': g_optimizer.state_dict(),
                         'd_optimizer': d_optimizer.state_dict(),
                     },
-                    f'checkpoint/trained_step-{step-1}.model',
+                    f'checkpoint/trained-step-{step}-{str(i + 1).zfill(6)}.model',
                 )
+
+            step += 1
+            alpha = 0
+            used_sample = 0
+
+            resolution = 4 * 2 ** min(step, max_step)
+
+            loader = sample_data(
+                dataset, args.batch.get(resolution, max(1, args.batch_size // (2 ** (min(step, max_step) - 1)))), resolution
+            )
+            data_loader = iter(loader)
 
             adjust_lr(g_optimizer, args.lr.get(resolution, 0.001))
             adjust_lr(d_optimizer, args.lr.get(resolution, 0.001))
@@ -275,7 +271,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--phase',
         type=int,
-        default=320000,
+        default=240000,
         help='number of samples used for each training phases',
     )
     parser.add_argument('--iters', default=100000, type=int, help='total iterations')
@@ -334,9 +330,10 @@ if __name__ == '__main__':
     #     with open(tmp_file, 'rb') as reader:
     #         M = torch.load(reader)
 
-    # batch_size: 32 16 8  4   2   1
+    # train_step: 1  2  3  4   5   6
+    # batch_size: 48 24 12 6   3   1
     # image_size: 8  16 32 64  128 256
-    # step_iters: 2w 4w 8w 16w 32w 64w
+    # step_iters: 1w 2w 4w 8w  16w 32w (phase = 24w)
 
     accumulate(g_running, generator.module, 0)
 
