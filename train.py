@@ -211,26 +211,26 @@ def train(args, dataset, generator, discriminator):
             requires_grad(discriminator, True)
 
         # generate sample images while training
-        # if (i + 1) % 100 == 0:
-        #     images = []
+        if (i + 1) % 1000 == 0:
+            images = []
 
-        #     gen_i, gen_j = args.gen_sample.get(resolution, (10, 5))
+            gen_i, gen_j = args.gen_sample.get(resolution, (10, 5))
 
-        #     with torch.no_grad():
-        #         for _ in range(gen_i):
-        #             images.append(
-        #                 g_running(
-        #                     torch.randn(gen_j, code_size).to(args.device), step=step, alpha=alpha
-        #                 ).data.cpu()
-        #             )
+            with torch.no_grad():
+                for _ in range(gen_i):
+                    images.append(
+                        g_running(
+                            torch.randn(gen_j, code_size).to(args.device), step=step, alpha=alpha
+                        ).data.cpu()
+                    )
 
-        #     utils.save_image(
-        #         torch.cat(images, 0),
-        #         f'sample/{str(i + 1).zfill(6)}.png',
-        #         nrow=gen_i,
-        #         normalize=True,
-        #         range=(-1, 1),
-        #     )
+            utils.save_image(
+                torch.cat(images, 0),
+                f'sample/{str(i + 1).zfill(6)}.png',
+                nrow=gen_i,
+                normalize=True,
+                range=(-1, 1),
+            )
 
         if not args.debug and ((i + 1) % 10000 == 0):
             # torch.save(

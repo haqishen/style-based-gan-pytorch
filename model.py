@@ -414,7 +414,10 @@ class Discriminator(nn.Module):
                 out_std = torch.sqrt(out.var(0, unbiased=False) + 1e-8)
                 mean_std = out_std.mean()
                 mean_std = mean_std.expand(out.size(0), 1, 4, 4)
-                out = torch.cat([out, mean_std], 1)
+                try:
+                    out = torch.cat([out, mean_std], 1)
+                except:
+                    import ipdb; ipdb.set_trace()
 
             out = self.progression[index](out)
 
