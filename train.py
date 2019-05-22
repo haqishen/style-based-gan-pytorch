@@ -55,8 +55,9 @@ def adjust_lr(optimizer, lr):
 
 def train(args, dataset, generator, discriminator):
     step = int(math.log2(args.init_size)) - 2
-    max_step = int(math.log2(args.max_size)) - 2
     resolution = 4 * 2 ** step
+    level_up = True
+
     loader = sample_data(
         dataset, args.batch.get(resolution, args.batch_size), resolution
     )
@@ -82,7 +83,7 @@ def train(args, dataset, generator, discriminator):
 
         alpha = min(1, 1 / args.phase * (used_sample + 1))
 
-        if (used_sample > args.phase * 2) and (step <= max_step):
+        if level_up and (used_sample > args.phase * 2):
             if not args.debug:
                 torch.save(
                     {
@@ -95,13 +96,16 @@ def train(args, dataset, generator, discriminator):
                 )
 
             step += 1
+            if step > (int(math.log2(args.max_size)) - 2):
+                level_up = False
+                step -= 1
             alpha = 0
             used_sample = 0
 
-            resolution = 4 * 2 ** min(step, max_step)
+            resolution = 4 * 2 ** step
 
             loader = sample_data(
-                dataset, args.batch.get(resolution, max(1, args.batch_size // (2 ** (min(step, max_step) - 1)))), resolution
+                dataset, args.batch.get(resolution, max(1, args.batch_size // (2 ** (step - 1)))), resolution
             )
             data_loader = iter(loader)
 
