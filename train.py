@@ -275,10 +275,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '--phase',
         type=int,
-        default=240000,
+        default=160000,
         help='number of samples used for each training phases',
     )
-    parser.add_argument('--iters', default=100000, type=int, help='total iterations')
+    parser.add_argument('--iters', default=630000, type=int, help='total iterations')
     parser.add_argument('--batch-size', default=32, type=int, help='batch size of step 1')
     parser.add_argument('--from-iter', default=1, type=int, help='train from which step')
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
@@ -304,8 +304,15 @@ if __name__ == '__main__':
         help=('Specify dataset. ' 'Currently Image Folder and LSUN is supported'),
     )
     parser.add_argument('--debug', action='store_true')
-
     args = parser.parse_args()
+
+    def INFO(inputs):
+        print("[ Style GAN pytorch ] %s" % (inputs))
+    INFO("========== Parameters ==========")
+    for key in (vars(args).keys()):
+        INFO("{:>15} : {}".format(key, vars(args)[key]))
+    INFO("===============================")
+
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     generator = nn.DataParallel(StyledGenerator(code_size)).to(args.device)
@@ -335,9 +342,10 @@ if __name__ == '__main__':
     #         M = torch.load(reader)
 
     # train_step: 1  2  3  4   5   6
-    # batch_size: 48 24 12 6   3   1
+    # batch_size: 32 16 8  4   2   1
     # image_size: 8  16 32 64  128 256
-    # step_iters: 1w 2w 4w 8w  16w 32w (phase = 24w)
+    # step_iters: 2w 4w 8w 16w 32w 64w (phase = 32w)
+    # step_iters = np.cumsum([10000, 20000, 40000, 80000, 160000, 320000])
 
     accumulate(g_running, generator.module, 0)
 
