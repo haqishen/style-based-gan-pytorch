@@ -98,15 +98,16 @@ def train(args, dataset, generator, discriminator):
             )
             data_loader = iter(loader)
 
-            torch.save(
-                {
-                    'generator': generator.module.state_dict(),
-                    'discriminator': discriminator.module.state_dict(),
-                    'g_optimizer': g_optimizer.state_dict(),
-                    'd_optimizer': d_optimizer.state_dict(),
-                },
-                f'checkpoint/train_step-{step}.model',
-            )
+            if not args.debug:
+                torch.save(
+                    {
+                        'generator': generator.module.state_dict(),
+                        'discriminator': discriminator.module.state_dict(),
+                        'g_optimizer': g_optimizer.state_dict(),
+                        'd_optimizer': d_optimizer.state_dict(),
+                    },
+                    f'checkpoint/trained_step-{step-1}.model',
+                )
 
             adjust_lr(g_optimizer, args.lr.get(resolution, 0.001))
             adjust_lr(d_optimizer, args.lr.get(resolution, 0.001))
@@ -213,30 +214,40 @@ def train(args, dataset, generator, discriminator):
             requires_grad(generator, False)
             requires_grad(discriminator, True)
 
-        if (i + 1) % 100 == 0:
-            images = []
+        # generate sample images while training
+        # if (i + 1) % 100 == 0:
+        #     images = []
 
-            gen_i, gen_j = args.gen_sample.get(resolution, (10, 5))
+        #     gen_i, gen_j = args.gen_sample.get(resolution, (10, 5))
 
-            with torch.no_grad():
-                for _ in range(gen_i):
-                    images.append(
-                        g_running(
-                            torch.randn(gen_j, code_size).to(args.device), step=step, alpha=alpha
-                        ).data.cpu()
-                    )
+        #     with torch.no_grad():
+        #         for _ in range(gen_i):
+        #             images.append(
+        #                 g_running(
+        #                     torch.randn(gen_j, code_size).to(args.device), step=step, alpha=alpha
+        #                 ).data.cpu()
+        #             )
 
-            utils.save_image(
-                torch.cat(images, 0),
-                f'sample/{str(i + 1).zfill(6)}.png',
-                nrow=gen_i,
-                normalize=True,
-                range=(-1, 1),
-            )
+        #     utils.save_image(
+        #         torch.cat(images, 0),
+        #         f'sample/{str(i + 1).zfill(6)}.png',
+        #         nrow=gen_i,
+        #         normalize=True,
+        #         range=(-1, 1),
+        #     )
 
-        if (i + 1) % 10000 == 0:
+        if not args.debug and ((i + 1) % 10000 == 0):
+            # torch.save(
+            #     g_running.state_dict(), f'checkpoint/{str(i + 1).zfill(6)}.model'
+            # )
             torch.save(
-                g_running.state_dict(), f'checkpoint/{str(i + 1).zfill(6)}.model'
+                {
+                    'generator': generator.module.state_dict(),
+                    'discriminator': discriminator.module.state_dict(),
+                    'g_optimizer': g_optimizer.state_dict(),
+                    'd_optimizer': d_optimizer.state_dict(),
+                },
+                f'checkpoint/{str(i + 1).zfill(6)}.model',
             )
 
         state_msg = (
@@ -264,11 +275,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '--phase',
         type=int,
-        default=600_000,
+        default=320000,
         help='number of samples used for each training phases',
     )
     parser.add_argument('--iters', default=100000, type=int, help='total iterations')
-    parser.add_argument('--batch-size', default=32, type=int, help='total iterations')
+    parser.add_argument('--batch-size', default=32, type=int, help='batch size of step 1')
+    parser.add_argument('--from-iter', default=1, type=int, help='train from which step')
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     parser.add_argument('--sched', action='store_true', help='use lr scheduling')
     parser.add_argument('--init-size', default=8, type=int, help='initial image size')
@@ -291,6 +303,7 @@ if __name__ == '__main__':
         choices=['folder', 'lsun'],
         help=('Specify dataset. ' 'Currently Image Folder and LSUN is supported'),
     )
+    parser.add_argument('--debug', action='store_true')
 
     args = parser.parse_args()
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -314,6 +327,17 @@ if __name__ == '__main__':
     )
     d_optimizer = optim.Adam(discriminator.parameters(), lr=args.lr, betas=(0.0, 0.99))
 
+    # if args.from_iter > 1:
+    #     tmp_file = f'checkpoint/trained_step-{args.from_step - 1}.model'
+    #     if not os.path.exists(tmp_file):
+    #         raise FileNotFoundError(f'model file {tmp_file} not exists!')
+    #     with open(tmp_file, 'rb') as reader:
+    #         M = torch.load(reader)
+
+    # batch_size: 32 16 8  4   2   1
+    # image_size: 8  16 32 64  128 256
+    # step_iters: 2w 4w 8w 16w 32w 64w
+
     accumulate(g_running, generator.module, 0)
 
     if args.data == 'folder':
@@ -325,7 +349,6 @@ if __name__ == '__main__':
     if args.sched:
         args.lr = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
         args.batch = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32, 128: 32, 256: 32}
-
     else:
         args.lr = {}
         args.batch = {}
@@ -333,5 +356,4 @@ if __name__ == '__main__':
     args.gen_sample = {512: (8, 4), 1024: (4, 2)}
 
     args.batch_default = 32
-    import ipdb; ipdb.set_trace()
     train(args, dataset, generator, discriminator)
