@@ -86,7 +86,7 @@ class EqualConv2d(nn.Module):
         conv = nn.Conv2d(*args, **kwargs)
         conv.weight.data.normal_()
         conv.bias.data.zero_()
-        self.conv = equal_lr(conv)
+        self.conv = equal_lr(conv)  # equal_lr is a way to init params
 
     def forward(self, input):
         return self.conv(input)
@@ -148,41 +148,37 @@ class AdaptiveInstanceNorm(nn.Module):
         super().__init__()
 
         self.norm = nn.InstanceNorm2d(in_channel)
-        self.style = EqualLinear(style_dim, in_channel * 2)
+        self.linear_layer = EqualLinear(style_dim, in_channel * 2)
 
-        self.style.linear.bias.data[:in_channel] = 1
-        self.style.linear.bias.data[in_channel:] = 0
+        self.linear_layer.linear.bias.data[:in_channel] = 1
+        self.linear_layer.linear.bias.data[in_channel:] = 0
 
-    def forward(self, input, style):
-        style = self.style(style).unsqueeze(2).unsqueeze(3)
+    def forward(self, x, style):
+        style = self.linear_layer(style).unsqueeze(2).unsqueeze(3)  # [bs, 512, 1, 1]
         gamma, beta = style.chunk(2, 1)
 
-        out = self.norm(input)
-        out = gamma * out + beta
-
-        return out
+        return gamma * self.norm(x) + beta
 
 
+# TODO
 class NoiseInjection(nn.Module):
     def __init__(self, channel):
         super().__init__()
 
-        self.weight = nn.Parameter(torch.zeros(1, channel, 1, 1))
+        self.weight = nn.Parameter(torch.ones(1, channel, 1, 1))
 
-    def forward(self, image, noise):
-        return image + self.weight * noise
+    def forward(self, x, noise):
+        return x + self.weight * noise
 
 
 class ConstantInput(nn.Module):
     def __init__(self, channel, size=4):
         super().__init__()
 
-        self.input = nn.Parameter(torch.randn(1, channel, size, size))
+        self.const_random_input = nn.Parameter(torch.randn(1, channel, size, size))
 
-    def forward(self, input):
-        batch = input.shape[0]
-        out = self.input.repeat(batch, 1, 1, 1)
-
+    def forward(self, x):
+        out = self.const_random_input.repeat(x.shape[0], 1, 1, 1)
         return out
 
 
@@ -199,9 +195,11 @@ class StyledConvBlock(nn.Module):
         super().__init__()
 
         if initial:
+            # first layer outputs constant random value (bs, 512, 4, 4)
             self.conv1 = ConstantInput(in_channel)
 
         else:
+            # other layers are common conv
             self.conv1 = EqualConv2d(
                 in_channel, out_channel, kernel_size, padding=padding
             )
@@ -267,7 +265,8 @@ class Generator(nn.Module):
         out = noise[0]
 
         if len(style) < 2:
-            inject_index = [len(self.progression) + 1]
+            # if only have 1 input, do not ?
+            inject_index = [len(self.progression) + 1]  # [10]
 
         else:
             inject_index = random.sample(list(range(step)), len(style) - 1)
@@ -279,7 +278,7 @@ class Generator(nn.Module):
                 if crossover < len(inject_index) and i > inject_index[crossover]:
                     crossover = min(crossover + 1, len(style))
 
-                style_step = style[crossover]
+                style_step = style[crossover]  # the only input
 
             else:
                 if mixing_range[0] <= i <= mixing_range[1]:
@@ -289,23 +288,43 @@ class Generator(nn.Module):
                     style_step = style[0]
 
             if i > 0 and step > 0:
+                ### NEW ADDED
+                # last step with fade out
+                if i == step and (0 <= alpha < 1):
+                    skip_rgb = self.to_rgb[i - 1](out)
+                    skip_rgb = F.interpolate(
+                        skip_rgb, scale_factor=2, mode='bilinear', align_corners=False
+                    )
+                ###
+                # other layers 
                 upsample = F.interpolate(
                     out, scale_factor=2, mode='bilinear', align_corners=False
                 )
                 # upsample = self.blur(upsample)
                 out = conv(upsample, style_step, noise[i])
 
+                ### NEW ADDED
+                # last step
+                if i == step:
+                    out = to_rgb(out)
+                    # if fade out
+                    if 0 <= alpha < 1:
+                        out = (1 - alpha) * skip_rgb + alpha * out
+                    break
+                ###
+
             else:
+                # the first conv layer (step 0)
                 out = conv(out, style_step, noise[i])
 
-            if i == step:
-                out = to_rgb(out)
-
-                if i > 0 and 0 <= alpha < 1:
-                    skip_rgb = self.to_rgb[i - 1](upsample)
-                    out = (1 - alpha) * skip_rgb + alpha * out
-
-                break
+            # if i == step:
+            #     # last step, so output rgb images
+            #     out = to_rgb(out)
+            #     import ipdb; ipdb.set_trace()
+            #     # if 0 < alpha < 1, fade in
+            #     if i > 0 and 0 <= alpha < 1:
+            #         skip_rgb = self.to_rgb[i - 1](upsample)
+            #         out = (1 - alpha) * skip_rgb + alpha * out
 
         return out
 
@@ -335,18 +354,19 @@ class StyledGenerator(nn.Module):
     ):
         styles = []
         if type(input) not in (list, tuple):
-            input = [input]
+            input = [input]  # -> [torch.Tensor]
 
+        # pass input to 8 fc layers
         for i in input:
             styles.append(self.style(i))
 
-        batch = input[0].shape[0]
+        batch = input[0].shape[0]  # batch_size
 
         if noise is None:
             noise = []
 
-            for i in range(step + 1):
-                size = 4 * 2 ** i
+            for i in range(step + 1):  # [0, 1, 2... step]
+                size = 4 * 2 ** i  # [4, 8, 16, ... 512]
                 noise.append(torch.randn(batch, 1, size, size, device=input[0].device))
 
         if mean_style is not None:
@@ -426,10 +446,10 @@ class Discriminator(nn.Module):
 
                 if i == step and 0 <= alpha < 1:
                     # skip_rgb = F.avg_pool2d(input, 2)
-                    skip_rgb = self.from_rgb[index + 1](input)
                     skip_rgb = F.interpolate(
-                        skip_rgb, scale_factor=0.5, mode='bilinear', align_corners=False
+                        input, scale_factor=0.5, mode='bilinear', align_corners=False
                     )
+                    skip_rgb = self.from_rgb[index + 1](skip_rgb)
 
                     out = (1 - alpha) * skip_rgb + alpha * out
 

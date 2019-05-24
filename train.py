@@ -91,6 +91,7 @@ def train(args, dataset, generator, discriminator):
                         'discriminator': discriminator.module.state_dict(),
                         'g_optimizer': g_optimizer.state_dict(),
                         'd_optimizer': d_optimizer.state_dict(),
+                        'g_running': g_running.state_dict(),
                     },
                     f'checkpoint/trained-step-{step}-{str(i + 1).zfill(6)}.model',
                 )
@@ -189,6 +190,7 @@ def train(args, dataset, generator, discriminator):
 
         d_optimizer.step()
 
+        # update G parameters every {n_critic} iters
         if (i + 1) % n_critic == 0:
             generator.zero_grad()
 
@@ -237,21 +239,19 @@ def train(args, dataset, generator, discriminator):
             )
 
         if not args.debug and ((i + 1) % 10000 == 0):
-            # torch.save(
-            #     g_running.state_dict(), f'checkpoint/{str(i + 1).zfill(6)}.model'
-            # )
             torch.save(
                 {
                     'generator': generator.module.state_dict(),
                     'discriminator': discriminator.module.state_dict(),
                     'g_optimizer': g_optimizer.state_dict(),
                     'd_optimizer': d_optimizer.state_dict(),
+                    'g_running': g_running.state_dict(),
                 },
                 f'checkpoint/{str(i + 1).zfill(6)}.model',
             )
 
         state_msg = (
-            f'Size: {4 * 2 ** step}; G: {gen_loss_val:.3f}; D: {disc_loss_val:.3f};'
+            f' Size: {4 * 2 ** step}; G: {gen_loss_val:.3f}; D: {disc_loss_val:.3f};'
             f' Grad: {grad_loss_val:.3f}; Alpha: {alpha:.5f}'
         )
 
@@ -266,7 +266,7 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--path', type=str,
-        default=os.path.join(os.environ.get('DATA_DIR'), 'animeface-character-dataset/thumb'),
+        default=os.path.join(os.environ.get('DATA_DIR'), 'animeface-character-dataset/thumb/037_lala_satalin_deviluke'),
         help='path of specified dataset'
     )
     parser.add_argument(
