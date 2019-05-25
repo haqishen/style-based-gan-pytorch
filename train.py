@@ -93,7 +93,7 @@ def train(args, dataset, generator, discriminator):
                         'd_optimizer': d_optimizer.state_dict(),
                         'g_running': g_running.state_dict(),
                     },
-                    f'checkpoint/trained-step-{step}-{str(i + 1).zfill(6)}.model',
+                    f'{args.model_dir}/trained-step-{step}-{str(i + 1).zfill(6)}.model',
                 )
 
             step += 1
@@ -232,7 +232,7 @@ def train(args, dataset, generator, discriminator):
 
             utils.save_image(
                 torch.cat(images, 0),
-                f'sample/{str(i + 1).zfill(6)}.png',
+                f'{args.sample_dir}/{str(i + 1).zfill(6)}.png',
                 nrow=gen_i,
                 normalize=True,
                 range=(-1, 1),
@@ -247,7 +247,7 @@ def train(args, dataset, generator, discriminator):
                     'd_optimizer': d_optimizer.state_dict(),
                     'g_running': g_running.state_dict(),
                 },
-                f'checkpoint/{str(i + 1).zfill(6)}.model',
+                f'{args.model_dir}/{str(i + 1).zfill(6)}.model',
             )
 
         state_msg = (
@@ -285,6 +285,8 @@ if __name__ == '__main__':
     parser.add_argument('--sched', action='store_true', help='use lr scheduling')
     parser.add_argument('--init-size', default=8, type=int, help='initial image size')
     parser.add_argument('--max-size', default=256, type=int, help='max image size')
+    parser.add_argument('--model-dir', default='checkpoint/', type=str, help='path to save models')
+    parser.add_argument('--sample-dir', default='sample/', type=str, help='path to save samples')
     parser.add_argument(
         '--mixing', action='store_true', help='use mixing regularization'
     )
@@ -312,6 +314,9 @@ if __name__ == '__main__':
     for key in (vars(args).keys()):
         INFO("{:>15} : {}".format(key, vars(args)[key]))
     INFO("===============================")
+
+    os.makedirs(args.model_dir, exist_ok=True)
+    os.makedirs(args.sample_dir, exist_ok=True)
 
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
