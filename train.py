@@ -270,15 +270,11 @@ if __name__ == '__main__':
         help='path of specified dataset'
     )
     parser.add_argument(
-        '--n_gpu', type=int, default=1, help='number of gpu used for training'
-    )
-    parser.add_argument(
         '--phase',
         type=int,
         default=160000,
         help='number of samples used for each training phases',
     )
-    parser.add_argument('--iters', default=630000, type=int, help='total iterations')
     parser.add_argument('--batch-size', default=32, type=int, help='batch size of step 1')
     parser.add_argument('--from-iter', default=1, type=int, help='train from which step')
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
@@ -307,6 +303,11 @@ if __name__ == '__main__':
     )
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
+
+    max_step = (int(math.log2(args.max_size)) - 2)
+    args.iters = 0
+    for i in range(max_step):
+        args.iters += int(args.phase * 2 / args.batch_size * 2 ** i)
 
     def INFO(inputs):
         print("[ Style GAN pytorch ] %s" % (inputs))
