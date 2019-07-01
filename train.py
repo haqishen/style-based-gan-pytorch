@@ -120,9 +120,10 @@ def train(args, dataset, generator, discriminator):
             data_loader = iter(loader)
             real_image, label = next(data_loader)
 
-        used_sample += real_image.shape[0]
+        b_size = real_image.shape[0]
 
-        b_size = real_image.size(0)
+        used_sample += b_size
+
         real_image = real_image.to(args.device)
         label = label.to(args.device)
 
@@ -251,7 +252,7 @@ def train(args, dataset, generator, discriminator):
             )
 
         state_msg = (
-            f' Size: {4 * 2 ** step}; G: {gen_loss_val:.3f}; D: {disc_loss_val:.3f};'
+            f' Size: {4 * 2 ** step}; BSize: {b_size}; G: {gen_loss_val:.3f}; D: {disc_loss_val:.3f};'
             f' Grad: {grad_loss_val:.3f}; Alpha: {alpha:.5f}'
         )
 
@@ -361,7 +362,7 @@ if __name__ == '__main__':
     if args.sched:
         args.lr = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
         # args.batch = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32, 128: 32, 256: 32}  # 1 gpu
-        args.batch = {4: 4096, 8: 2048, 16: 1024, 32: 512, 64: 256, 128: 128, 256: 64}  # 4 gpus
+        args.batch = {4: 4096, 8: 128, 16: 128, 32: 128, 64: 64, 128: 128, 256: 64}  # 4 gpus
     else:
         args.lr = {}
         args.batch = {}
@@ -375,5 +376,4 @@ if __name__ == '__main__':
 
     args.gen_sample = {512: (8, 4), 1024: (4, 2)}
 
-    args.batch_default = 32
     train(args, dataset, generator, discriminator)
