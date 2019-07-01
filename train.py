@@ -305,12 +305,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     max_step = (int(math.log2(args.max_size)) - 2)
-    args.iters = 0
-    for i in range(max_step):
-        if args.sched:
-            args.iters += int(args.phase / list(args.batch.values())[i]) * 2
-        else:
-            args.iters += int(args.phase / args.batch_size) * 2
 
     def INFO(inputs):
         print("[ Style GAN pytorch ] %s" % (inputs))
@@ -371,6 +365,13 @@ if __name__ == '__main__':
     else:
         args.lr = {}
         args.batch = {}
+
+    args.iters = 0
+    for i in range(max_step):
+        if args.sched:
+            args.iters += int(args.phase / list(args.batch.values())[i]) * 2
+        else:
+            args.iters += int(args.phase / args.batch_size) * 2
 
     args.gen_sample = {512: (8, 4), 1024: (4, 2)}
 
