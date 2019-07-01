@@ -359,7 +359,8 @@ if __name__ == '__main__':
     elif args.data == 'lsun':
         dataset = datasets.LSUNClass(args.path, target_transform=lambda x: 0)
 
-    args.batch = {8: 128, 16: 64, 32: 32, 64: 16}
+    args.batch = {8: 128*2, 16: 64*2, 32: 32*2, 64: 16*2}
+
     if args.sched:
         args.lr = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
         # args.batch = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32, 128: 32, 256: 32}
