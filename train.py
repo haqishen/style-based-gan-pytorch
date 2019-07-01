@@ -307,7 +307,10 @@ if __name__ == '__main__':
     max_step = (int(math.log2(args.max_size)) - 2)
     args.iters = 0
     for i in range(max_step):
-        args.iters += int(args.phase * 2 / args.batch_size * 2 ** i)
+        if args.sched:
+            args.iters += int(args.phase / list(args.batch.values())[i]) * 2
+        else:
+            args.iters += int(args.phase / args.batch_size) * 2
 
     def INFO(inputs):
         print("[ Style GAN pytorch ] %s" % (inputs))
@@ -363,7 +366,8 @@ if __name__ == '__main__':
 
     if args.sched:
         args.lr = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
-        args.batch = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32, 128: 32, 256: 32}
+        # args.batch = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32, 128: 32, 256: 32}  # 1 gpu
+        args.batch = {4: 4096, 8: 2048, 16: 1024, 32: 512, 64: 256, 128: 128, 256: 64}  # 4 gpus
     else:
         args.lr = {}
         args.batch = {}
