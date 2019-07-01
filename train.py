@@ -55,11 +55,11 @@ def adjust_lr(optimizer, lr):
 
 def train(args, dataset, generator, discriminator):
     step = int(math.log2(args.init_size)) - 2
-    resolution = 4 * 2 ** step
+    resolution = int(4 * 2 ** step)
     level_up = True
 
     loader = sample_data(
-        dataset, args.batch.get(resolution, args.batch_size), resolution
+        dataset, args.batch.get(resolution, args.batch[resolution]), resolution
     )
     data_loader = iter(loader)
 
@@ -106,7 +106,7 @@ def train(args, dataset, generator, discriminator):
             resolution = 4 * 2 ** step
 
             loader = sample_data(
-                dataset, args.batch.get(resolution, max(1, args.batch_size // (2 ** (step - 1)))), resolution
+                dataset, args.batch.get(resolution, max(1, args.batch[resolution])), resolution
             )
             data_loader = iter(loader)
 
@@ -359,20 +359,16 @@ if __name__ == '__main__':
     elif args.data == 'lsun':
         dataset = datasets.LSUNClass(args.path, target_transform=lambda x: 0)
 
+    args.batch = {4: 0, 8: 128, 16: 64, 32: 32, 64: 16, 128: 0, 256: 0}
     if args.sched:
         args.lr = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
-        # args.batch = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32, 128: 32, 256: 32}  # 1 gpu
-        args.batch = {4: 4096, 8: 128, 16: 128, 32: 128, 64: 64, 128: 128, 256: 64}  # 4 gpus
+        # args.batch = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32, 128: 32, 256: 32}
     else:
         args.lr = {}
-        args.batch = {}
 
     args.iters = 0
     for i in range(max_step):
-        if args.sched:
-            args.iters += int(args.phase / list(args.batch.values())[i]) * 2
-        else:
-            args.iters += int(args.phase / args.batch_size) * 2
+        args.iters += int(args.phase / list(args.batch.values())[i]) * 2
 
     args.gen_sample = {512: (8, 4), 1024: (4, 2)}
 
