@@ -128,9 +128,12 @@ def train(args, dataset, generator, discriminator):
         label = label.to(args.device)
 
         if args.loss == 'wgan-gp':
-            real_predict = discriminator(real_image, step=step, alpha=alpha)
-            real_predict = real_predict.mean() - 0.001 * (real_predict ** 2).mean()
-            (-real_predict).backward()
+            try:
+                real_predict = discriminator(real_image, step=step, alpha=alpha)
+                real_predict = real_predict.mean() - 0.001 * (real_predict ** 2).mean()
+                (-real_predict).backward()
+            except:
+                import ipdb; ipdb.set_trace()
 
         elif args.loss == 'r1':
             real_image.requires_grad = True
