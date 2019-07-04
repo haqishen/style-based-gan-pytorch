@@ -335,11 +335,11 @@ class StyledGenerator(nn.Module):
 
         self.generator = Generator(code_dim)
 
+        # 8 fc layers
         layers = [PixelNorm()]
         for i in range(n_mlp):
             layers.append(EqualLinear(code_dim, code_dim))
             layers.append(nn.LeakyReLU(0.2))
-
         self.style = nn.Sequential(*layers)
 
     def forward(
@@ -356,7 +356,7 @@ class StyledGenerator(nn.Module):
         if type(input) not in (list, tuple):
             input = [input]  # -> [torch.Tensor]
 
-        # pass input to 8 fc layers
+        # firstly, pass input to 8 fc layers
         for i in input:
             styles.append(self.style(i))
 
@@ -377,6 +377,7 @@ class StyledGenerator(nn.Module):
 
             styles = styles_norm
 
+        # lastly, generate
         return self.generator(styles, noise, step, alpha, mixing_range=mixing_range)
 
     def mean_style(self, input):
@@ -424,37 +425,41 @@ class Discriminator(nn.Module):
         self.linear = EqualLinear(512, 1)
 
     def forward(self, input, step=0, alpha=-1):
-        for i in range(step, -1, -1):
-            index = self.n_layer - i - 1
+        try:
+            for i in range(step, -1, -1):
+                index = self.n_layer - i - 1
 
-            if i == step:
-                out = self.from_rgb[index](input)
+                if i == step:
+                    out = self.from_rgb[index](input)
 
-            if i == 0:
-                out_std = torch.sqrt(out.var(0, unbiased=False) + 1e-8)
-                mean_std = out_std.mean()
-                mean_std = mean_std.expand(out.size(0), 1, 4, 4)
-                out = torch.cat([out, mean_std], 1)
+                if i == 0:
+                    out_std = torch.sqrt(out.var(0, unbiased=False) + 1e-8)
+                    mean_std = out_std.mean()
+                    mean_std = mean_std.expand(out.size(0), 1, 4, 4)
+                    out = torch.cat([out, mean_std], 1)
 
-            out = self.progression[index](out)
+                out = self.progression[index](out)
 
-            if i > 0:
-                # out = F.avg_pool2d(out, 2)
-                out = F.interpolate(
-                    out, scale_factor=0.5, mode='bilinear', align_corners=False
-                )
-
-                if i == step and 0 <= alpha < 1:
-                    # skip_rgb = F.avg_pool2d(input, 2)
-                    skip_rgb = F.interpolate(
-                        input, scale_factor=0.5, mode='bilinear', align_corners=False
+                if i > 0:
+                    # out = F.avg_pool2d(out, 2)
+                    out = F.interpolate(
+                        out, scale_factor=0.5, mode='bilinear', align_corners=False
                     )
-                    skip_rgb = self.from_rgb[index + 1](skip_rgb)
 
-                    out = (1 - alpha) * skip_rgb + alpha * out
+                    if i == step and 0 <= alpha < 1:
+                        # skip_rgb = F.avg_pool2d(input, 2)
+                        skip_rgb = F.interpolate(
+                            input, scale_factor=0.5, mode='bilinear', align_corners=False
+                        )
+                        skip_rgb = self.from_rgb[index + 1](skip_rgb)
 
-        out = out.squeeze(2).squeeze(2)
-        # print(input.size(), out.size(), step)
-        out = self.linear(out)
+                        out = (1 - alpha) * skip_rgb + alpha * out
+
+            out = out.squeeze(2).squeeze(2)
+            # print(input.size(), out.size(), step)
+            out = self.linear(out)
+
+        except:
+            import ipdb; ipdb.set_trace()
 
         return out

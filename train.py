@@ -42,7 +42,7 @@ def sample_data(dataset, batch_size, image_size=4):
     )
 
     dataset.transform = transform
-    loader = DataLoader(dataset, shuffle=True, batch_size=batch_size, num_workers=16)
+    loader = DataLoader(dataset, shuffle=True, batch_size=batch_size, drop_last=True, num_workers=16)
 
     return loader
 
@@ -128,12 +128,9 @@ def train(args, dataset, generator, discriminator):
         label = label.to(args.device)
 
         if args.loss == 'wgan-gp':
-            try:
-                real_predict = discriminator(real_image, step=step, alpha=alpha)
-                real_predict = real_predict.mean() - 0.001 * (real_predict ** 2).mean()
-                (-real_predict).backward()
-            except:
-                import ipdb; ipdb.set_trace()
+            real_predict = discriminator(real_image, step=step, alpha=alpha)
+            real_predict = real_predict.mean() - 0.001 * (real_predict ** 2).mean()
+            (-real_predict).backward()
 
         elif args.loss == 'r1':
             real_image.requires_grad = True
